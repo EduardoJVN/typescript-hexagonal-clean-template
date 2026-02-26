@@ -1,3 +1,4 @@
+/* global console, process */
 import { build } from 'esbuild';
 
 async function runBuild() {

@@ -1,6 +1,6 @@
 export interface ILogger {
-  info(msg: string, ...args: any[]): void;
-  error(msg: string, ...args: any[]): void;
-  warn(msg: string, ...args: any[]): void;
-  debug(msg: string, ...args: any[]): void;
+  info(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  debug(message: string, context?: Record<string, unknown>): void;
 }
