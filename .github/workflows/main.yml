@@ -1,0 +1,35 @@
+name: Main Branch Guard
+
+on:
+  push:
+    branches: [ main ]
+  # También se activa si el destino de un MR es específicamente main
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  main-verification:
+    name: Final Integrity Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛒 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
+
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: 🔍 Run Linter
+        run: yarn lint
+
+      - name: 🧪 Run Unit Tests
+        run: yarn test
+
+      - name: 🏗️ Final Production Build
+        run: yarn build
