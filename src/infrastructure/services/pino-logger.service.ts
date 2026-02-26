@@ -9,15 +9,23 @@ export class PinoLogger implements ILogger {
     this.logger = pino({
       level,
       // Aquí podrías añadir pino-pretty si estás en desarrollo
-      transport: process.env.NODE_ENV !== 'production' 
-        ? { target: 'pino-pretty' } 
-        : undefined,
+      transport: process.env.NODE_ENV !== 'production' ? { target: 'pino-pretty' } : undefined,
     });
   }
 
-  info(msg: string, ...args: any[]) { this.logger.info(msg, ...args); }
-  error(msg: string, ...args: any[]) { this.logger.error(msg, ...args); }
-  warn(msg: string, ...args: any[]) { this.logger.warn(msg, ...args); }
-  debug(msg: string, ...args: any[]) { this.logger.debug(msg, ...args); }
-  trace(msg: string, ...args: any[]) { this.logger.trace(msg, ...args); }
+  info(msg: string, ...args: any[]) {
+    this.logger.info(msg, ...args);
+  }
+  error(msg: string, ...args: any[]) {
+    this.logger.error(msg, ...args);
+  }
+  warn(msg: string, ...args: any[]) {
+    this.logger.warn(msg, ...args);
+  }
+  debug(msg: string, ...args: any[]) {
+    this.logger.debug(msg, ...args);
+  }
+  trace(msg: string, ...args: any[]) {
+    this.logger.trace(msg, ...args);
+  }
 }

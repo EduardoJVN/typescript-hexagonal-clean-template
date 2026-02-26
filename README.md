@@ -26,8 +26,6 @@ Una base sólida, agnóstica y ultra-rápida para proyectos Backend. Diseñada b
 
 El corazón del proyecto es **agnóstico a la tecnología**. La infraestructura es solo un detalle de implementación en la capa externa.
 
-
-
 ```text
 src/
 ├── core/                 # Lógica de Negocio Pura (Independiente)
@@ -44,47 +42,51 @@ src/
 
 ## 🛠️ Comandos Disponibles
 
-|           Comando         |                       Descripción                             |
-| ------------------------- |:-------------------------------------------------------------:|
-| `npm run dev`             | Inicia el modo desarrollo con hot-reload usando `tsx`         |
-| `npm run build`           | Genera un bundle optimizado en `/dist` mediante `esbuild`.    |
-| `npm run test`            | Ejecuta la suite de pruebas con Vitest.                       |
-| `npm run test:unit`       | Ejecuta la suite de pruebas con Vitest.                       |
-| `npm run lint`            | Analiza el código buscando errores de calidad.                |
-| `npm run format`          | Formatea automáticamente el código con Prettier.              |
-| `npm run test:coverage`   | Genera un reporte de cobertura de pruebas.                    |
-
+| Comando                 |                        Descripción                         |
+| ----------------------- | :--------------------------------------------------------: |
+| `npm run dev`           |   Inicia el modo desarrollo con hot-reload usando `tsx`    |
+| `npm run build`         | Genera un bundle optimizado en `/dist` mediante `esbuild`. |
+| `npm run test`          |          Ejecuta la suite de pruebas con Vitest.           |
+| `npm run test:unit`     |          Ejecuta la suite de pruebas con Vitest.           |
+| `npm run lint`          |       Analiza el código buscando errores de calidad.       |
+| `npm run format`        |      Formatea automáticamente el código con Prettier.      |
+| `npm run test:coverage` |         Genera un reporte de cobertura de pruebas.         |
 
 ## 💉 Inyección de Dependencias (Agnóstica)
 
 Para que el núcleo sea reutilizable, inyecta las implementaciones de infraestructura en los casos de uso:
 
 ```typescript
-    // Ejemplo: src/infrastructure/entry-points/server.ts
-    const repository = new PostgresUserRepository();
-    const registerUser = new RegisterUser(repository); // El caso de uso solo conoce la interfaz
+// Ejemplo: src/infrastructure/entry-points/server.ts
+const repository = new PostgresUserRepository();
+const registerUser = new RegisterUser(repository); // El caso de uso solo conoce la interfaz
 
-    // Este mismo 'registerUser' puede ser llamado desde un Controller de Express
-    // o desde el Handler de una AWS Lambda.
+// Este mismo 'registerUser' puede ser llamado desde un Controller de Express
+// o desde el Handler de una AWS Lambda.
 ```
 
-
 ## ⚙️ Configuración Inicial
+
 1. Instalar dependencias:
+
 ```bash
     npm install
 ```
+
 2. Variables de entorno:
-Copia el archivo de ejemplo y configura tus variables:
+   Copia el archivo de ejemplo y configura tus variables:
+
 ```bash
     cp .env.example .env
 ```
+
 3. Git Hooks:
-Husky se configurará automáticamente para validar tus commits.
+   Husky se configurará automáticamente para validar tus commits.
 
 ## 🤝 Convenciones de Código
+
 - **Commits:** Siguen el estándar de Conventional Commits.
 - **Imports:** Usa siempre los alias configurados:
-    - `@core/` para lógica de negocio.
-    - `@infra/` para adaptadores y drivers.
-    - `@shared/` para herramientas transversales.
+  - `@core/` para lógica de negocio.
+  - `@infra/` para adaptadores y drivers.
+  - `@shared/` para herramientas transversales.

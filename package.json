@@ -7,8 +7,9 @@
     "node": "v24.14.0"
   },
   "scripts": {
-    "start": "tsx watch src/app.ts",
+    "dev": "tsx watch src/app.ts",
     "build": "node scripts/build.js",
+    "start": "node dist/app.js",
     "lint": "eslint . --fix",
     "format": "prettier --write .",
     "test": "vitest run",

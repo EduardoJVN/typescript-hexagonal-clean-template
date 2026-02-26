@@ -1,11 +1,10 @@
-
 import { DomainError } from './DomainError.js';
 import { Logger } from '../logger/Logger.js';
 
 export class GlobalErrorHandler {
   static init(logger: Logger) {
-    process.on('uncaughtException', e => this.handle(e, logger));
-    process.on('unhandledRejection', e => this.handle(e, logger));
+    process.on('uncaughtException', (e) => this.handle(e, logger));
+    process.on('unhandledRejection', (e) => this.handle(e, logger));
   }
 
   static handle(error: unknown, logger: Logger) {
