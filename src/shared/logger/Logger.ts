@@ -1,9 +1,9 @@
+import pino from 'pino';
+import type { Level, Logger as PinoLogger } from 'pino';
+export type Logger = PinoLogger
 
-export class Logger {
-  info(msg: string) {
-    console.log(`[INFO] ${msg}`);
-  }
-  error(msg: string) {
-    console.error(`[ERROR] ${msg}`);
-  }
-}
+export const Logger = function (this: Logger , level: Level = 'info' ): Logger {
+  return pino({
+    level: level,
+  });
+} as unknown as {new (level?: Level): Logger};

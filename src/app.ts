@@ -1,20 +1,13 @@
+import { PinoLogger } from '@infra/services/pino-logger.service.js';
+import { z } from 'zod';
 
-import { Logger } from './shared/logger/Logger.js';
-import { GlobalErrorHandler } from './shared/errors/GlobalErrorHandler.js';
-import { EventBus } from './domain/events/EventBus.js';
-import { InMemoryPersonRepository } from './infrastructure/person/InMemoryPersonRepository.js';
-import { CreatePerson } from './application/person/CreatePerson.js';
+const logger = new PinoLogger();
 
-const logger = new Logger();
-GlobalErrorHandler.init(logger);
-
-const eventBus = new EventBus();
-eventBus.subscribe('PersonCreatedEvent', async e => {
-  logger.info(`Person created with id ${e.personId}`);
+const envSchema = z.object({
+  NODE_ENV: z.string().default('development'),
 });
 
-const repo = new InMemoryPersonRepository();
-const createPerson = new CreatePerson(repo, eventBus);
+const env = envSchema.parse(process.env);
 
-// Example execution
-await createPerson.execute('Juan', 15);
+logger.info(`🚀 Template iniciado en modo: ${env.NODE_ENV}`);
+logger.info('✅ Alias @infra funcionando correctamente');
