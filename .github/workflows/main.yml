@@ -2,10 +2,10 @@ name: Main Branch Guard
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   # También se activa si el destino de un MR es específicamente main
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   main-verification:
