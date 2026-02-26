@@ -4,7 +4,7 @@
   "type": "module",
   "main": "dist/app.js",
   "engines": {
-    "node": "v24.14.0"
+    "node": ">=24.13.0"
   },
   "scripts": {
     "dev": "tsx watch src/app.ts",
