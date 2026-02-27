@@ -2,14 +2,14 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: ["**"] # Todas las ramas
+    branches: ["**"]
   pull_request:
     branches: [develop, qa, main]
-  release:
-    types: [published]
+  # Escuchamos la creación de tags para el deploy de PROD
+  create:
+    tags: ['v*']
 
 jobs:
-  # --- 1. CALIDAD (Se ejecuta SIEMPRE para toda rama y PR) ---
   quality-check:
     name: 🔍 Calidad (Lint & Test)
     runs-on: ubuntu-latest
@@ -21,21 +21,19 @@ jobs:
           cache: 'yarn'
       - name: 📦 Install
         run: yarn install --frozen-lockfile
-      - name: 🔍 Lint
-        run: yarn lint
-      - name: 🧪 Unit Tests
-        run: yarn test
+      - name: 🔍 Lint & Test
+        run: |
+          yarn lint
+          yarn test
 
-  # --- 2. BUILD (Solo en ramas principales o PRs hacia ellas) ---
   build-check:
     name: 🏗️ Build Verification
     needs: quality-check
     runs-on: ubuntu-latest
-    # Se ejecuta si es una de las 3 ramas principales (push) O si es un PR hacia ellas
     if: |
       contains(fromJSON('["refs/heads/main", "refs/heads/develop", "refs/heads/qa"]'), github.ref) ||
       contains(fromJSON('["main", "develop", "qa"]'), github.base_ref) ||
-      github.event_name == 'release'
+      startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,25 +45,26 @@ jobs:
       - name: 🏗️ Build
         run: yarn build
 
-  # --- 3. DEPLOY (Solo tras el Build en las ramas principales) ---
   deploy:
     name: 🚀 Deploy
     needs: build-check
     runs-on: ubuntu-latest
-    # Solo despliega en PUSH real a la rama (no en PRs) o en Release
+    # Solo desplegamos si es un PUSH a dev/qa O si es un TAG de versión
     if: |
-      (github.event_name == 'push' || github.event_name == 'release') &&
-      contains(fromJSON('["refs/heads/main", "refs/heads/develop", "refs/heads/qa"]'), github.ref)
+      (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/qa')) ||
+      (github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v'))
     
     steps:
       - name: 🚀 Deploy to DEV
         if: github.ref == 'refs/heads/develop'
-        run: echo "Desplegando en Servidor DEV..."
+        run: echo "Desplegando en DEV (Rama develop)..."
 
       - name: 🧪 Deploy to QA
         if: github.ref == 'refs/heads/qa'
-        run: echo "Desplegando en Servidor QA..."
+        run: echo "Desplegando en QA (Rama qa)..."
 
       - name: 🏁 Deploy to PROD
-        if: github.event_name == 'release'
-        run: echo "Desplegando en Servidor PROD (Tag Oficial) ${{ github.event.release.tag_name }}..."
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "🚀 DESPLIEGUE OFICIAL DE PRODUCCIÓN"
+          echo "Usando versión: ${{ github.ref_name }}"
