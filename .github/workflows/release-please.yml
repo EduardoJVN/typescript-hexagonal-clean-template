@@ -15,5 +15,4 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          # Tipo de proyecto (node para package.json)
           release-type: node
