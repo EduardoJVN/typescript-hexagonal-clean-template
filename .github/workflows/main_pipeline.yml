@@ -1,0 +1,71 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["**"] # Todas las ramas
+  pull_request:
+    branches: [develop, qa, main]
+  release:
+    types: [published]
+
+jobs:
+  # --- 1. CALIDAD (Se ejecuta SIEMPRE para toda rama y PR) ---
+  quality-check:
+    name: 🔍 Calidad (Lint & Test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
+      - name: 📦 Install
+        run: yarn install --frozen-lockfile
+      - name: 🔍 Lint
+        run: yarn lint
+      - name: 🧪 Unit Tests
+        run: yarn test
+
+  # --- 2. BUILD (Solo en ramas principales o PRs hacia ellas) ---
+  build-check:
+    name: 🏗️ Build Verification
+    needs: quality-check
+    runs-on: ubuntu-latest
+    # Se ejecuta si es una de las 3 ramas principales (push) O si es un PR hacia ellas
+    if: |
+      contains(fromJSON('["refs/heads/main", "refs/heads/develop", "refs/heads/qa"]'), github.ref) ||
+      contains(fromJSON('["main", "develop", "qa"]'), github.base_ref) ||
+      github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
+      - name: 📦 Install
+        run: yarn install --frozen-lockfile
+      - name: 🏗️ Build
+        run: yarn build
+
+  # --- 3. DEPLOY (Solo tras el Build en las ramas principales) ---
+  deploy:
+    name: 🚀 Deploy
+    needs: build-check
+    runs-on: ubuntu-latest
+    # Solo despliega en PUSH real a la rama (no en PRs) o en Release
+    if: |
+      (github.event_name == 'push' || github.event_name == 'release') &&
+      contains(fromJSON('["refs/heads/main", "refs/heads/develop", "refs/heads/qa"]'), github.ref)
+    
+    steps:
+      - name: 🚀 Deploy to DEV
+        if: github.ref == 'refs/heads/develop'
+        run: echo "Desplegando en Servidor DEV..."
+
+      - name: 🧪 Deploy to QA
+        if: github.ref == 'refs/heads/qa'
+        run: echo "Desplegando en Servidor QA..."
+
+      - name: 🏁 Deploy to PROD
+        if: github.event_name == 'release'
+        run: echo "Desplegando en Servidor PROD (Tag Oficial) ${{ github.event.release.tag_name }}..."
