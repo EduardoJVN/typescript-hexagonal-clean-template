@@ -1,41 +1,27 @@
-# --- STAGE 1: Builder ---
+# --- Stage 1: Build ---
 FROM node:24-alpine AS builder
-
+# Instalar dependencias necesarias para compilar algunos paquetes de node si fuera necesario
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copiamos archivos de dependencias para aprovechar el cache de capas
-COPY package.json yarn.lock* ./
-
-# Instalamos todas las dependencias (incluyendo devDeps para el build)
+COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
 
-# Copiamos el resto del código y el script de build
 COPY . .
-
-# Generamos el bundle minificado en /dist
 RUN yarn build
 
-# --- STAGE 2: Runner ---
+# --- Stage 2: Production ---
 FROM node:24-alpine AS runner
-
 WORKDIR /app
-
-# Definimos el entorno como producción
 ENV NODE_ENV=production
 
-# Copiamos solo el bundle generado y el package.json del builder
-COPY --from=builder /app/dist ./dist
+# Copiamos solo lo esencial
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
 
-# Instalamos SOLO las dependencias de producción
-# Esto es necesario porque usamos 'packages: external' en esbuild
-RUN yarn install --production --frozen-lockfile && yarn cache clean
-
-# Usuario no-root por seguridad
+# Usuario no-root por seguridad (Alpine lo trae por defecto)
 USER node
 
-# Exponemos el puerto (ajusta según tu app)
 EXPOSE 3000
-
-# Ejecutamos el bundle
-CMD ["node", "dist/app.js"]
+CMD ["node", "dist/main.js"]

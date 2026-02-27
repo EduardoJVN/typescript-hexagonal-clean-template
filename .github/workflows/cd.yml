@@ -1,0 +1,44 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & Push Image
+        run: |
+          # Aquí construyes tu imagen una sola vez
+          echo "Construyendo imagen v${{ github.sha }}"
+
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to DEV
+        run: echo "Desplegando automáticamente en el Servidor DEV..."
+
+  deploy-qa:
+    needs: deploy-dev # Espera a que DEV termine
+    runs-on: ubuntu-latest
+    # AQUÍ ESTÁ EL TRUCO:
+    environment: qa 
+    steps:
+      - name: Deploy to QA
+        run: |
+          echo "¡Botón pulsado! Desplegando en el Servidor QA..."
+          # Aquí iría el comando real de despliegue por SSH o lo que elijas
+
+  deploy-prod:
+    needs: deploy-qa # Solo se puede ir a PROD si pasó por QA
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to PROD
+        run: echo "Desplegando en el Servidor de Producción..."
