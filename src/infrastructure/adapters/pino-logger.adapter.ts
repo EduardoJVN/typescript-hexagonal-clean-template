@@ -2,7 +2,7 @@ import pino from 'pino';
 import type { Logger as PinoInstance } from 'pino';
 import type { ILogger } from '@domain/ports/logger.port';
 
-export class PinoLogger implements ILogger {
+export class Logger implements ILogger {
   private logger: PinoInstance;
 
   constructor(level: string = 'info') {
