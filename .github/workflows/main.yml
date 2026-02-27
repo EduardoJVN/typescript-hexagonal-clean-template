@@ -1,16 +1,15 @@
-name: PR Quality Check
+name: Main Branch Guard
 
 on:
   push:
     branches: [main, develop, qa] # Se activa para pushes directos a main, develop o qa
-    
+  # También se activa si el destino de un MR es específicamente main
   pull_request:
-    # Se activa para MRs hacia CUALQUIER rama
-    types: [opened, synchronize, reopened]
+    branches: [main, develop, qa]
 
 jobs:
-  validate-pr:
-    name: Lint, Test & Build Verification
+  main-verification:
+    name: Final Integrity Check
     runs-on: ubuntu-latest
 
     steps:
@@ -32,5 +31,5 @@ jobs:
       - name: 🧪 Run Unit Tests
         run: yarn test
 
-      - name: 🏗️ Verify Production Build
+      - name: 🏗️ Final Production Build
         run: yarn build
