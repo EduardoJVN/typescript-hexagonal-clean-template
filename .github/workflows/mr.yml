@@ -1,9 +1,6 @@
 name: PR Quality Check
 
 on:
-  push:
-    branches: [main, develop, qa] # Se activa para pushes directos a main, develop o qa
-    
   pull_request:
     # Se activa para MRs hacia CUALQUIER rama
     types: [opened, synchronize, reopened]
