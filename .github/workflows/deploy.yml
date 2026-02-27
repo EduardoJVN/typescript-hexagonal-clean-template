@@ -1,0 +1,28 @@
+name: Deploy Environments
+
+on:
+  push:
+    branches: [develop, qa, main]
+  release:
+    types: [published] # Para el tag final de Prod
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- LÓGICA PARA DEV ---
+      - name: Deploy to DEV
+        if: github.ref == 'refs/heads/develop'
+        run: echo "Desplegando en Servidor DEV (Rama develop)..."
+
+      # --- LÓGICA PARA QA ---
+      - name: Deploy to QA
+        if: github.ref == 'refs/heads/qa'
+        run: echo "Desplegando en Servidor QA (Rama qa)..."
+
+      # --- LÓGICA PARA PROD (Solo con Tag) ---
+      - name: Deploy to PROD
+        if: github.event_name == 'release'
+        run: echo "Desplegando en PROD (Tag oficial ${{ github.event.release.tag_name }})..."
