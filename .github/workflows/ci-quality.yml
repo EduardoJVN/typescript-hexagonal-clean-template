@@ -1,0 +1,42 @@
+name: CI Quality Check
+
+on:
+  push:
+    # Se activa en CUALQUIER rama
+    branches: ["**"]
+  pull_request:
+    # Se activa en PRs hacia las ramas base
+    branches: [develop, qa, main]
+
+jobs:
+  validate:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
+
+      - name: 📦 Install
+        run: yarn install --frozen-lockfile
+
+      - name: 🔍 Lint
+        run: yarn lint
+
+      - name: 🧪 Unit Tests
+        run: yarn test
+
+      # --- VALIDACIÓN CONDICIONAL DEL BUILD ---
+      # Solo ejecutamos el Build si estamos en una rama principal o en un PR
+      # Esto ahorra tiempo en ramas de feature pequeñas
+      - name: 🏗️ Production Build
+        if: |
+          github.ref == 'refs/heads/main' || 
+          github.ref == 'refs/heads/develop' || 
+          github.ref == 'refs/heads/qa' ||
+          github.event_name == 'pull_request'
+        run: yarn build
