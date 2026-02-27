@@ -3,7 +3,7 @@ name: release-please
 on:
   push:
     branches:
-      - main
+      - main # El bot solo se despierta cuando algo llega a producción
 
 permissions:
   contents: write
@@ -15,5 +15,4 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          # Tipo de proyecto (node para package.json)
           release-type: node
