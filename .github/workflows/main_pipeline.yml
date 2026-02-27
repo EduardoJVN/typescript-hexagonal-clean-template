@@ -5,9 +5,7 @@ on:
     branches: ["**"]
   pull_request:
     branches: [develop, qa, main]
-  # Escuchamos la creación de tags para el deploy de PROD
-  create:
-    tags: ['v*']
+  create: 
 
 jobs:
   quality-check:
@@ -30,10 +28,11 @@ jobs:
     name: 🏗️ Build Verification
     needs: quality-check
     runs-on: ubuntu-latest
+    # Ejecutar si es una rama principal, un PR hacia ellas, o la creación de un Tag
     if: |
       contains(fromJSON('["refs/heads/main", "refs/heads/develop", "refs/heads/qa"]'), github.ref) ||
-      contains(fromJSON('["main", "develop", "qa"]'), github.base_ref) ||
-      startsWith(github.ref, 'refs/tags/v')
+      github.event_name == 'pull_request' ||
+      github.event.ref_type == 'tag'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,22 +48,22 @@ jobs:
     name: 🚀 Deploy
     needs: build-check
     runs-on: ubuntu-latest
-    # Solo desplegamos si es un PUSH a dev/qa O si es un TAG de versión
+    # Solo despliega en PUSH a dev/qa O cuando se crea un TAG (PROD)
     if: |
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/qa')) ||
-      (github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v'))
+      (github.event_name == 'create' && github.event.ref_type == 'tag')
     
     steps:
       - name: 🚀 Deploy to DEV
         if: github.ref == 'refs/heads/develop'
-        run: echo "Desplegando en DEV (Rama develop)..."
+        run: echo "Desplegando en DEV..."
 
       - name: 🧪 Deploy to QA
         if: github.ref == 'refs/heads/qa'
-        run: echo "Desplegando en QA (Rama qa)..."
+        run: echo "Desplegando en QA..."
 
       - name: 🏁 Deploy to PROD
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event.ref_type == 'tag'
         run: |
           echo "🚀 DESPLIEGUE OFICIAL DE PRODUCCIÓN"
-          echo "Usando versión: ${{ github.ref_name }}"
+          echo "Tag detectado: ${{ github.event.ref }}"
