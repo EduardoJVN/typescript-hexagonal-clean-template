@@ -1,3 +1,4 @@
+import globals from "globals";
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
@@ -25,6 +26,22 @@ export default tseslint.config(
       '@typescript-eslint/no-empty-interface': 'off',
     },
   },
+  // --- CONFIGURACIÓN PARA ARCHIVOS COMMONJS (commitlint, etc.) ---
+  {
+    files: ['**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      // Desactivamos reglas de TS que no aplican a archivos JS puros
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-var-requires': 'off',
+    },
+  },
+  // -------------------------------------------------------------
   // Siempre al final para sobrescribir reglas de formato
   eslintConfigPrettier,
 );

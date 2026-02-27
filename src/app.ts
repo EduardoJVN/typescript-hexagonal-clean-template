@@ -1,13 +1,18 @@
-import { PinoLogger } from '@infra/services/pino-logger.service.js';
-import { z } from 'zod';
+import { PinoLogger } from '@infra/adapters/pino-logger.adapter';
+import { MockAgentAdapter } from '@infra/ai/adapters/mock-agent.adapter';
+import { AnalyzeCommentUseCase } from '@application/ai/use-cases/analyze-comment.use-case';
 
-const logger = new PinoLogger();
+async function bootstrap() {
+  // 1. Instanciar infraestructura
+  const logger = new PinoLogger();
+  const aiAgent = new MockAgentAdapter();
 
-const envSchema = z.object({
-  NODE_ENV: z.string().default('development'),
-});
+  // 2. Inyectar en aplicación
+  const analyzer = new AnalyzeCommentUseCase(aiAgent, logger);
 
-const env = envSchema.parse(process.env);
+  // 3. Ejecutar
+  const result = await analyzer.execute("Este template de arquitectura es excelente");
+  logger.info('Resultado Final:', { result });
+}
 
-logger.info(`🚀 Template iniciado en modo: ${env.NODE_ENV}`);
-logger.info('✅ Alias @infra funcionando correctamente');
+bootstrap();

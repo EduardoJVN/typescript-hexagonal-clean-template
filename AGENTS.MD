@@ -1,65 +1,63 @@
-# 🤖 Agent Instructions & Project Standards
+# 🤖 AI Agents & Automation Logic
 
-Este archivo contiene las reglas de oro y directrices técnicas para programar en este repositorio. Cualquier IA que trabaje en este proyecto debe adherirse estrictamente a estas normas.
-
-## 🎯 Objetivo de la Arquitectura
-
-Implementamos **Arquitectura Hexagonal (Ports & Adapters)**. El objetivo es que el **Core** (Negocio) nunca dependa de la **Infraestructura** (Herramientas).
+Este documento describe cómo integrar Agentes de IA y servicios de automatización dentro de la Arquitectura Hexagonal de este template.
 
 ---
 
-## 🏗️ Reglas de Dependencia
+## 🏗️ Ubicación en la Arquitectura
 
-1. **Core es Sagrado:** No puede importar nada de `infrastructure`, ni librerías externas que no sean de lógica pura (como `zod`).
-2. **Inyección de Dependencias:** Los Casos de Uso deben recibir sus dependencias (Repositories, Services) mediante interfaces (Inversión de Dependencia).
-3. **Sentido de las Flechas:** `Infrastructure` ➡️ `Core` (Permitido)
-   `Core` ➡️ `Infrastructure` (PROHIBIDO)
+Para mantener el desacoplamiento, los agentes se distribuyen siguiendo la regla de dependencia:
 
----
+### 1. Capa de Dominio (`src/domain/ai`)
+Aquí definimos **qué** puede hacer el agente, sin importar qué modelo (OpenAI, Claude, Local LLM) se use.
+- **Ports:** Interfaces como `IAgentProvider`, `IPromptRepository`.
+- **Entities:** Definición de `AgentResponse`, `ConversationContext`.
 
-## 📂 Estructura de Capas
+### 2. Capa de Aplicación (`src/application/ai`)
+Aquí reside la **orquestación** del agente.
+- **Use Cases:** `ProcessNaturalLanguageCommand`, `GenerateReportWithAI`.
+- Los casos de uso reciben los *Ports* e interactúan con los modelos de negocio.
 
-- `@core/entities`: Objetos de dominio, reglas de negocio validadas con Zod.
-- `@core/use-cases`: Orquestadores de la lógica. Solo llaman a entidades y definiciones de interfaces.
-- `@infra/entry-points`: Controladores HTTP, Handlers de Lambda, CLI.
-- `@infra/repositories`: Implementaciones de persistencia (Prisma, SQL, In-memory).
-- `@infra/services`: Implementaciones de clientes externos (Email, Stripe, etc).
-- `@shared`: Utilidades comunes que no contienen lógica de negocio.
-
----
-
-## 🛠️ Stack Técnico & Restricciones
-
-- **Runtime:** Node.js v24 LTS.
-- **Formato:** ESM (EcmaScript Modules) únicamente.
-- **Tipado:** TypeScript estricto. Prohibido el uso de `any`.
-- **Manejo de Errores:** Evitar `throw` en el Core si es posible; preferir patrones de retorno de errores o validaciones de Zod.
-- **Validación:** Usar `zod` para validar cada entrada de datos en los entry-points y en las entidades.
-- **Logging:** Usar el logger `pino` (inyectado o importado en infra). No usar `console.log`.
+### 3. Capa de Infraestructura (`src/infrastructure/adapters/ai`)
+Aquí implementamos la tecnología específica.
+- **Adapters:** `OpenAIAgentAdapter`, `LangChainWrapper`.
+- Es la única capa que conoce las API Keys y los SDKs de terceros.
 
 ---
 
-## 📜 Estilo de Código
+## 🛠️ Flujo de Trabajo de un Agente
 
-- **Path Aliasing:** Usar siempre `@core/*`, `@infra/*`, y `@shared/*`. No usar rutas relativas `../../`.
-- **Interfaces:** Definir interfaces de repositorios dentro de `@core/use-cases` o una carpeta `ports` dentro de core.
-- **Naming:** - Clases: PascalCase.
-  - Funciones/Variables: camelCase.
-  - Archivos: kebab-case (ej: `register-user.use-case.ts`).
 
----
 
-## 🧪 Estándar de Testing
-
-- **Herramienta:** Vitest.
-- **Unit Tests:** Obligatorios para cada Use Case en `@core`. Usar Mocks/Spies para las interfaces de infraestructura.
-- **Integration Tests:** En `@infra` para validar conexiones con DB o APIs reales/testcontainers.
+1. **Input:** Un `entry-point` (ej. una ruta de Express) recibe un prompt.
+2. **Orquestación:** El Caso de Uso de la capa de **Application** solicita al **Domain** las reglas de validación.
+3. **Ejecución:** Se llama al adaptador en **Infrastructure** para comunicarse con el modelo de IA.
+4. **Logging:** Todo el proceso se traza utilizando el `ILogger` inyectado.
 
 ---
 
-## 🚨 Antes de generar código, verifica:
+## 📋 Estándares para Agentes
 
-1. ¿Este nuevo archivo está en la capa correcta?
-2. ¿Estoy importando algo de `/infrastructure` dentro de `/core`? (Si es así, detente).
-3. ¿He definido el esquema de Zod para los datos de entrada?
-4. ¿He actualizado los tests correspondientes?
+| Requisito | Descripción |
+| :--- | :--- |
+| **Stateless** | Los agentes deben ser sin estado siempre que sea posible; el contexto se pasa en el DTO. |
+| **Timeout Guard** | Todo llamado a un agente externo debe incluir un límite de tiempo en infraestructura. |
+| **Mocking** | Debido al costo y latencia, todos los agentes deben tener un `MockAgentAdapter` para tests. |
+| **Observabilidad** | Los prompts y respuestas deben loguearse (anonimizados) para auditoría. |
+
+---
+
+## 🚀 Ejemplo de Inyección
+
+```typescript
+// En Application
+constructor(
+  private readonly agent: IAgentProvider,
+  private readonly logger: ILogger
+) {}
+
+async execute(input: string) {
+  this.logger.info("Agente iniciando proceso...");
+  return await this.agent.complete(input);
+}
+```

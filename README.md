@@ -1,92 +1,88 @@
-# 🏗️ Hexagonal Clean Template (Node 24 LTS)
+# TypeScript Hexagonal Architecture Template 🚀
 
-Una base sólida, agnóstica y ultra-rápida para proyectos Backend. Diseñada bajo los principios de **Arquitectura Hexagonal** y **Clean Code**, preparada para ser desplegada en cualquier entorno (Express, Fastify, AWS Lambda o Google Cloud Functions).
+Este es un template base para Node.js (v24+) diseñado bajo los principios de **Arquitectura Hexagonal** y **Domain-Driven Design (DDD)**. Está optimizado para ser escalable, testeable y listo para producción.
 
-[![Node Version](https://img.shields.io/badge/node-%3E%3D24.14.0-green)](https://nodejs.org/)
-[![Typescript](https://img.shields.io/badge/typescript-5.7+-blue)](https://www.typescriptlang.org/)
-[![Testing](https://img.shields.io/badge/test-vitest-yellow)](https://vitest.dev/)
-[![License](https://img.shields.io/badge/license-MIT-purple)](#)
+## 🛠️ Stack Tecnológico
 
----
-
-## 🚀 Características Principales
-
-- **Runtime:** Node.js 24 (LTS) con soporte nativo para módulos ESM.
-- **Transpilación:** `esbuild` para builds instantáneos y `tsx` para un desarrollo fluido.
-- **Calidad de Código:** ESLint 10 (Flat Config) + Prettier (separados para máximo rendimiento).
-- **Testing:** Vitest con soporte nativo de TypeScript y Path Aliasing.
-- **Validación:** Zod para esquemas de datos y validación de DTOs.
-- **Observabilidad:** Pino + Pino Pretty para logs estructurados de alto rendimiento.
-- **DX (Developer Experience):** - Path Aliasing (`@core`, `@infra`, `@shared`).
-  - Husky + Commitlint para mensajes de commit estandarizados.
+- **Runtime:** Node.js 24 (ESM Nativo)
+- **Lenguaje:** TypeScript 5.x
+- **Bundler:** esbuild (con soporte para Aliases)
+- **Linter & Formatter:** ESLint 10 + Prettier
+- **Testing:** Vitest (Unit & Integration)
+- **Logger:** Pino (Estructurado y de alto rendimiento)
+- **CI/CD:** GitHub Actions
+- **Git Hooks:** Husky + lint-staged + commitlint (Conventional Commits)
 
 ---
 
-## 📂 Estructura del Proyecto
+## 🏗️ Arquitectura y Estructura
 
-El corazón del proyecto es **agnóstico a la tecnología**. La infraestructura es solo un detalle de implementación en la capa externa.
+El proyecto utiliza un enfoque de **Vertical Slicing** dentro de las capas de Clean Architecture para facilitar la escalabilidad y el desacoplamiento.
+
+
 
 ```text
 src/
-├── core/                 # Lógica de Negocio Pura (Independiente)
-│   ├── entities/         # Modelos de dominio (Clases o Interfaces)
-│   └── use-cases/        # Reglas de negocio (Orquestadores)
-├── infrastructure/       # Implementaciones Técnicas (Mecanismos)
-│   ├── entry-points/     # Servidores (Express, Lambdas, CLI)
-│   ├── repositories/     # Adaptadores de BD (Prisma, SQL, In-memory)
-│   └── services/         # Clientes externos (APIs, Email, S3)
-├── shared/               # Código común, utilidades y constantes
-└── server.ts             # Punto de entrada principal
-
+├── domain/                # Capa 1: Lógica de negocio pura (Entidades y Reglas)
+│   ├── {module}/          # Módulos de negocio (ej: user, task)
+│   │   ├── entities/      # Objetos de dominio
+│   │   └── ports/         # Interfaces (Repositories, Services)
+│   └── shared/            # Interfaces transversales (ILogger, IEventBus)
+├── application/           # Capa 2: Casos de Uso (Orquestación)
+│   └── {module}/          # Lógica de flujo por módulo
+├── infrastructure/        # Capa 3: Implementaciones técnicas (Mundo exterior)
+│   ├── adapters/          # Implementaciones de los ports (DB, Email, Pino)
+│   ├── entry-points/      # Controladores (Express, Fastify, CLI)
+│   └── config/            # Configuraciones de infraestructura
+├── shared/                # Utilidades y código común transversal
+└── main.ts                # Composición y arranque de la aplicación (Bootstrap)
 ```
 
-## 🛠️ Comandos Disponibles
+---
 
-| Comando                 |                        Descripción                         |
-| ----------------------- | :--------------------------------------------------------: |
-| `npm run dev`           |   Inicia el modo desarrollo con hot-reload usando `tsx`    |
-| `npm run build`         | Genera un bundle optimizado en `/dist` mediante `esbuild`. |
-| `npm run test`          |          Ejecuta la suite de pruebas con Vitest.           |
-| `npm run test:unit`     |          Ejecuta la suite de pruebas con Vitest.           |
-| `npm run lint`          |       Analiza el código buscando errores de calidad.       |
-| `npm run format`        |      Formatea automáticamente el código con Prettier.      |
-| `npm run test:coverage` |         Genera un reporte de cobertura de pruebas.         |
+## 🚦 Automatización y Calidad (Git Hooks)
 
-## 💉 Inyección de Dependencias (Agnóstica)
+Este repositorio utiliza **Husky** y **lint-staged** para garantizar que ningún código "roto" llegue al repositorio:
 
-Para que el núcleo sea reutilizable, inyecta las implementaciones de infraestructura en los casos de uso:
+- **Pre-commit:** Se ejecuta automáticamente `eslint --fix`, `prettier --write` y los tests relacionados con los archivos modificados.
+- **Commit-msg:** Valida que los mensajes sigan el estándar de **Conventional Commits** (`feat:`, `fix:`, `chore:`, etc.).
 
-```typescript
-// Ejemplo: src/infrastructure/entry-points/server.ts
-const repository = new PostgresUserRepository();
-const registerUser = new RegisterUser(repository); // El caso de uso solo conoce la interfaz
+---
 
-// Este mismo 'registerUser' puede ser llamado desde un Controller de Express
-// o desde el Handler de una AWS Lambda.
-```
+## 🤖 CI/CD Pipelines
 
-## ⚙️ Configuración Inicial
+Configurado con **GitHub Actions**:
+1. **MR Check (`mr.yml`)**: Valida Lint, Tests y Build en cada Pull Request hacia cualquier rama.
+2. **Main Guard (`main.yml`)**: Validación final de integridad al fusionar en la rama `main`.
 
-1. Instalar dependencias:
+---
 
-```bash
-    npm install
-```
+## 🚀 Comandos Disponibles
 
-2. Variables de entorno:
-   Copia el archivo de ejemplo y configura tus variables:
+| Comando | Descripción |
+| :--- | :--- |
+| `yarn install` | Instala dependencias y configura los Git Hooks. |
+| `yarn dev` | Levanta el proyecto en modo desarrollo con hot-reload. |
+| `yarn build` | Genera el bundle de producción en `/dist` usando esbuild. |
+| `yarn lint` | Ejecuta el linter y corrige errores automáticos. |
+| `yarn test` | Ejecuta la suite de pruebas con Vitest. |
+| `yarn test:coverage` | Genera un reporte detallado de cobertura de código. |
 
-```bash
-    cp .env.example .env
-```
+---
 
-3. Git Hooks:
-   Husky se configurará automáticamente para validar tus commits.
+## 🔗 Alias de Rutas
 
-## 🤝 Convenciones de Código
+Para evitar los "relative imports hell" (`../../../`), puedes usar los siguientes alias:
+- `@domain/*` -> `src/domain/*`
+- `@application/*` -> `src/application/*`
+- `@infra/*` -> `src/infrastructure/*`
+- `@shared/*` -> `src/shared/*`
 
-- **Commits:** Siguen el estándar de Conventional Commits.
-- **Imports:** Usa siempre los alias configurados:
-  - `@core/` para lógica de negocio.
-  - `@infra/` para adaptadores y drivers.
-  - `@shared/` para herramientas transversales.
+---
+
+## 💡 Mejores Prácticas Incluidas
+1. **Inyección de Dependencias:** El Logger y los Repositorios se pasan vía constructor para facilitar el Mocking en tests.
+2. **Logs Transversales:** Implementación de `ILogger` en dominio para logging desacoplado.
+3. **Manejo de Errores:** Estructura preparada para excepciones de dominio personalizadas.
+
+---

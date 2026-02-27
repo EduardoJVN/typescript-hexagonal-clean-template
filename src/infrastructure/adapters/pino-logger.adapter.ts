@@ -1,6 +1,6 @@
 import pino from 'pino';
 import type { Logger as PinoInstance } from 'pino';
-import type { ILogger } from '@core/ports/logger.port';
+import type { ILogger } from '@domain/ports/logger.port';
 
 export class PinoLogger implements ILogger {
   private logger: PinoInstance;
