@@ -3,7 +3,7 @@ name: release-please
 on:
   push:
     branches:
-      - main # El bot solo se despierta cuando algo llega a producción
+      - main
 
 permissions:
   contents: write

@@ -1,28 +1,37 @@
-name: Deploy Environments
+name: Branch Deployment
 
 on:
   push:
     branches: [develop, qa, main]
   release:
-    types: [published] # Para el tag final de Prod
+    types: [published] # Se activa cuando el bot crea la release oficial en main
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    # Evitamos que el deploy corra para el commit de documentación del bot en main
+    if: "!contains(github.event.head_commit.message, 'chore(release)')"
+    
     steps:
       - uses: actions/checkout@v4
 
-      # --- LÓGICA PARA DEV ---
-      - name: Deploy to DEV
+      # --- DESPLIEGUE A DEV ---
+      - name: 🚀 Deploy to DEV
         if: github.ref == 'refs/heads/develop'
-        run: echo "Desplegando en Servidor DEV (Rama develop)..."
+        run: |
+          echo "Haciendo build de Docker para DEV..."
+          echo "Enviando imagen al Servidor DEV estático..."
 
-      # --- LÓGICA PARA QA ---
-      - name: Deploy to QA
+      # --- DESPLIEGUE A QA ---
+      - name: 🧪 Deploy to QA
         if: github.ref == 'refs/heads/qa'
-        run: echo "Desplegando en Servidor QA (Rama qa)..."
+        run: |
+          echo "Haciendo build de Docker para QA..."
+          echo "Enviando imagen al Servidor QA estático..."
 
-      # --- LÓGICA PARA PROD (Solo con Tag) ---
-      - name: Deploy to PROD
+      # --- DESPLIEGUE A PROD ---
+      # Solo ocurre cuando se publica una RELEASE (Tag oficial)
+      - name: 🏁 Deploy to PROD
         if: github.event_name == 'release'
-        run: echo "Desplegando en PROD (Tag oficial ${{ github.event.release.tag_name }})..."
+        run: |
+          echo "Desplegando versión oficial ${{ github.event.release.tag_name }} en PROD..."
