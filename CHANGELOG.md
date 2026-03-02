@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.2.0...v1.2.1) (2026-03-02)
+
+
+### Bug Fixes
+
+* prettier yarn format ([ebb6794](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/ebb67946f67eeb5849589583d603db56e8fb982e))
+
 ## [1.2.0](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.1.1...v1.2.0) (2026-03-02)
 
 
