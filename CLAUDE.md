@@ -60,6 +60,67 @@ src/
 
 **Commit messages:** Conventional Commits enforced by commitlint. Allowed prefixes: `feat`, `fix`, `chore`, `docs`, `test`, `style`, `refactor`, `perf`.
 
+## Testing Patterns
+
+**Pyramid:** many unit tests (domain + application) → some integration tests (adapters) → few E2E.
+
+### Domain layer — no mocks needed
+The domain has zero external dependencies. Instantiate directly and assert behavior.
+
+```typescript
+import { describe, it, expect } from 'vitest';
+
+describe('Order', () => {
+  it('throws when adding item to a cancelled order', () => {
+    const order = Order.create(CustomerId.from('cust-1'));
+    order.cancel('test');
+
+    expect(() => order.addItem(...)).toThrow(InvalidOrderStateError);
+  });
+});
+```
+
+### Application layer — mock ports as classes
+Never use `vi.fn()` for ports. Implement the port interface as a class — this catches type mismatches and keeps mocks readable.
+
+```typescript
+// In the same spec file or a shared helpers/ file
+class MockOrderRepository implements IOrderRepository {
+  savedOrders: Order[] = [];
+
+  async findById(id: OrderId): Promise<Order | null> {
+    return this.savedOrders.find(o => o.id.equals(id)) ?? null;
+  }
+
+  async save(order: Order): Promise<void> {
+    this.savedOrders.push(order);
+  }
+}
+
+describe('PlaceOrderUseCase', () => {
+  let useCase: PlaceOrderUseCase;
+  let repo: MockOrderRepository;
+
+  beforeEach(() => {
+    repo = new MockOrderRepository();
+    useCase = new PlaceOrderUseCase(repo, new MockLogger());
+  });
+
+  it('saves the order', async () => {
+    await useCase.execute({ customerId: 'cust-1', ... });
+    expect(repo.savedOrders).toHaveLength(1);
+  });
+});
+```
+
+### Key rules
+- **Mock only at port boundaries** — never mock domain classes or value objects
+- **Integration tests** test concrete adapters (Pino, DB, HTTP) with real infrastructure
+- **Builders** for complex test fixtures: `new OrderBuilder().withItem('p1', 2).confirmed().build()`
+- Test files live co-located in `__test__/` next to the module they test, or at `src/__test__/` for cross-cutting smoke tests
+
+---
+
 ## Tooling Notes
 
 - **Runtime:** Node.js 24 ESM native — use `import/export`, never `require()`
