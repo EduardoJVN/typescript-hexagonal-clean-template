@@ -37,19 +37,23 @@ Hexagonal + DDD with **Vertical Slicing** per module inside each layer. Dependen
 
 ```
 src/
-├── domain/            # Pure business logic — entities, port interfaces only
+├── domain/
+│   ├── ports/             # Cross-module ports (e.g. ILogger)
 │   └── {module}/
 │       ├── entities/
-│       └── ports/     # TypeScript interfaces (contracts for adapters)
-├── application/       # Use cases — orchestrate domain + injected ports
+│       ├── errors/        # Module-specific domain errors
+│       └── ports/         # Repository + external service interfaces
+├── application/
 │   └── {module}/
-│       └── use-cases/
-├── infrastructure/    # Concrete implementations of ports
-│   ├── adapters/      # DB, email, Pino logger, etc.
-│   ├── entry-points/  # HTTP controllers, CLI commands
-│   └── config/        # env vars, bootstrap helpers
-├── shared/            # Cross-cutting utilities
-└── app.ts             # Dependency composition root (bootstrap)
+│       ├── use-cases/
+│       └── dto/
+├── infrastructure/
+│   ├── adapters/          # DB, email, logger implementations
+│   ├── entry-points/      # HTTP controllers (BaseController lives here)
+│   └── config/            # env vars, bootstrap helpers
+├── shared/
+│   └── errors/            # DomainError, NotFoundError base classes
+└── app.ts                 # Composition root (temporary — replaced by framework bootstrap)
 ```
 
 **app.ts is the composition root.** All dependencies are instantiated and injected here — no service locators, no singletons in domain/application.
@@ -287,22 +291,40 @@ Controllers do **not** handle errors individually. All controllers extend `BaseC
 
 ```typescript
 // src/infrastructure/entry-points/base.controller.ts
+
+// These three interfaces are exported from base.controller.ts and used by all controllers
+export interface HttpRequest {
+  body?: unknown;
+  params?: Record<string, string>;
+  query?: Record<string, string>;
+}
+
+export interface HttpResponse {
+  status: number;
+  body: unknown;
+}
+
+export interface ErrorResponse {
+  status: number;
+  message: string;
+}
+
 export abstract class BaseController {
   protected async handleRequest<T>(
     action: () => Promise<T>,
-    onSuccess: (result: T) => void,
-    onError: (error: unknown) => void,
-  ): Promise<void> {
+    onSuccess: (result: T) => HttpResponse,
+    onError: (error: ErrorResponse) => HttpResponse,
+  ): Promise<HttpResponse> {
     try {
       const result = await action();
-      onSuccess(result);
+      return onSuccess(result);
     } catch (error) {
       if (error instanceof NotFoundError) {
-        onError({ status: 404, message: error.message });
+        return onError({ status: 404, message: error.message });
       } else if (error instanceof DomainError) {
-        onError({ status: 400, message: error.message });
+        return onError({ status: 400, message: error.message });
       } else {
-        onError({ status: 500, message: 'Internal server error' });
+        return onError({ status: 500, message: 'Internal server error' });
       }
     }
   }
@@ -311,6 +333,9 @@ export abstract class BaseController {
 
 ```typescript
 // src/infrastructure/entry-points/{module}.controller.ts
+import { BaseController } from './base.controller.js';
+import type { HttpRequest, HttpResponse } from './base.controller.js';
+
 export class {Module}Controller extends BaseController {
   constructor(private readonly createUseCase: Create{Module}UseCase) {
     super();
@@ -318,12 +343,12 @@ export class {Module}Controller extends BaseController {
 
   async create(req: HttpRequest): Promise<HttpResponse> {
     const parsed = Create{Module}Schema.safeParse(req.body);
-    if (!parsed.success) return { status: 400, body: { error: parsed.error.format() } };
+    if (!parsed.success) return { status: 400, body: { error: parsed.error.message } };
 
     return this.handleRequest(
       () => this.createUseCase.execute(parsed.data),
       (result) => ({ status: 201, body: result }),
-      (error: ErrorResponse) => ({ status: error.status, body: { error: error.message } }),
+      (error) => ({ status: error.status, body: { error: error.message } }),
     );
   }
 }
@@ -331,20 +356,82 @@ export class {Module}Controller extends BaseController {
 
 `BaseController` lives in `src/infrastructure/entry-points/`. Swapping to Lambda means overriding only the `onSuccess`/`onError` callbacks — error classification logic stays in one place.
 
+## ILogger
+
+`ILogger` is a cross-module port defined at `src/domain/ports/logger.port.ts`. All use cases receive it via constructor injection — **never** import Pino or any logging lib directly in domain or application.
+
+```typescript
+// src/domain/ports/logger.port.ts
+export interface ILogger {
+  info(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  debug(message: string, context?: Record<string, unknown>): void;
+}
+```
+
+```typescript
+// ✅ Use case receiving ILogger via constructor
+export class Create{Module}UseCase {
+  constructor(
+    private readonly repo: I{Module}Repository,
+    private readonly logger: ILogger,
+  ) {}
+}
+```
+
+In tests, implement `MockLogger` as a class (not `vi.fn()`):
+
+```typescript
+import type { ILogger } from '@domain/ports/logger.port.js';
+
+class MockLogger implements ILogger {
+  info = vi.fn();
+  error = vi.fn();
+  warn = vi.fn();
+  debug = vi.fn();
+}
+```
+
 ## Validation
 
 **Zod belongs ONLY in infrastructure/entry-points.** Never in domain or application.
 
-```typescript
-// ✅ infrastructure/entry-points/create-user.controller.ts
-const schema = z.object({ email: z.string().email(), name: z.string().min(1) });
-const input = schema.parse(rawBody);
-await createUserUseCase.execute(input);
+Always use `safeParse` (not `parse`) in controllers — it returns `{ success, data, error }` instead of throwing, which lets you return a structured 400 without hitting the `handleRequest` catch block.
 
+```typescript
+// ✅ infrastructure/entry-points/{module}.controller.ts
+const schema = z.object({ email: z.string().email(), name: z.string().min(1) });
+
+const parsed = schema.safeParse(req.body);
+if (!parsed.success) return { status: 400, body: { error: parsed.error.message } };
+
+await this.handleRequest(
+  () => useCase.execute(parsed.data),
+  (result) => ({ status: 201, body: result }),
+  (error) => ({ status: error.status, body: { error: error.message } }),
+);
+
+// ❌ Never use schema.parse() in controllers — unhandled throw bypasses the error shape
 // ❌ Never validate with Zod in a use case or entity
 ```
 
 The use case receives already-validated plain objects. Entities enforce business invariants by throwing domain errors, not by parsing schemas.
+
+## HTTP Status Codes
+
+Standard codes used across all controllers:
+
+| Operation | Success status | Notes |
+|---|---|---|
+| Create (POST) | `201` | Body contains the created resource |
+| Get by ID (GET) | `200` | Body contains the resource |
+| List (GET) | `200` | Body contains array or wrapper object |
+| Update (PUT/PATCH) | `200` | Body contains the updated resource |
+| Delete (DELETE) | `204` | Body is `null` |
+| Validation failure | `400` | Returned before `handleRequest`, from `safeParse` |
+
+Error responses from `handleRequest` always use: `{ error: string }` as body shape.
 
 ## Shared
 
