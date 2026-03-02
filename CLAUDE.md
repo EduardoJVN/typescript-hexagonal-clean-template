@@ -54,13 +54,75 @@ src/
 
 **app.ts is the composition root.** All dependencies are instantiated and injected here — no service locators, no singletons in domain/application.
 
-## Key Conventions
+## TypeScript & Import Rules
 
-**Path aliases** — always use these, never relative `../../` imports:
-- `@domain/*` → `src/domain/*`
-- `@application/*` → `src/application/*`
-- `@infra/*` → `src/infrastructure/*`
-- `@shared/*` → `src/shared/*`
+These rules are enforced by ESLint and TypeScript compiler. A lint or type error means the task is **not done**.
+
+### Path aliases — never use relative `../../` imports
+
+| Alias | Maps to |
+|---|---|
+| `@domain/*` | `src/domain/*` |
+| `@application/*` | `src/application/*` |
+| `@infra/*` | `src/infrastructure/*` |
+| `@shared/*` | `src/shared/*` |
+
+```typescript
+// ✅
+import { Order } from '@domain/order/entities/order.entity.js';
+import type { IOrderRepository } from '@domain/order/ports/order.repository.port.js';
+import type { PlaceOrderCommand } from '@application/order/dto/place-order.dto.js';
+
+// ❌
+import { Order } from '../../entities/order.entity.js';
+import { Order } from '../../../domain/order/entities/order.entity.js';
+```
+
+### `.js` extension — always required in imports
+
+Node.js ESM resolves extensions literally. TypeScript does **not** rewrite paths at emit time. Always write `.js` even inside `.ts` files — TypeScript maps `.ts → .js` transparently.
+
+```typescript
+// ✅
+import { PlaceOrderUseCase } from '@application/order/use-cases/place-order.use-case.js';
+
+// ❌  (fails at runtime — Node ESM requires the exact extension)
+import { PlaceOrderUseCase } from '@application/order/use-cases/place-order.use-case';
+import { PlaceOrderUseCase } from '@application/order/use-cases/place-order.use-case.ts';
+```
+
+### `import type` — required for type-only imports
+
+`verbatimModuleSyntax: true` is enabled. TypeScript errors if a type-only import omits `import type`.
+
+```typescript
+// ✅
+import type { IOrderRepository } from '@domain/order/ports/order.repository.port.js';
+import type { PlaceOrderCommand, PlaceOrderResult } from '@application/order/dto/place-order.dto.js';
+
+// ❌
+import { IOrderRepository } from '@domain/order/ports/order.repository.port.js';
+```
+
+Rule of thumb: interfaces, type aliases, and anything used only as a type annotation → `import type`.
+
+### `any` is forbidden
+
+`no-explicit-any` is an ESLint **error**. Use `unknown` for unknown values. For type casts in tests, use `as unknown as TargetType`.
+
+```typescript
+// ✅
+const value: unknown = externalData();
+const mock = { execute: vi.fn() } as unknown as PlaceOrderUseCase;
+
+// ❌
+const value: any = externalData();
+const mock = { execute: vi.fn() } as any;
+```
+
+---
+
+## Key Conventions
 
 **File naming:**
 - Port interfaces: `*.port.ts`
@@ -145,28 +207,26 @@ Entities use a **private constructor** and two static factories. **ID is always 
 
 ```typescript
 // src/domain/{module}/entities/{name}.entity.ts
-export class Product {
+export class {Entity} {
   private constructor(
     public readonly id: string,
-    public readonly name: string,
-    public price: number,
+    // ... domain-specific fields
   ) {}
 
   // For NEW entities — enforce business invariants, emit domain events if needed
-  static create(id: string, name: string, price: number): Product {
-    if (price <= 0) throw new InvalidPriceError(price);
-    return new Product(id, name, price);
+  static create(id: string, /* domain fields */): {Entity} {
+    // validate invariants, throw typed DomainError if violated
+    return new {Entity}(id, /* fields */);
   }
 
   // For LOADING from persistence — no validation, no events, just reconstruct state
-  static reconstitute(id: string, name: string, price: number): Product {
-    return new Product(id, name, price);
+  static reconstitute(id: string, /* domain fields */): {Entity} {
+    return new {Entity}(id, /* fields */);
   }
 
-  // Mutations modify state in place and validate invariants
-  updatePrice(price: number): void {
-    if (price <= 0) throw new InvalidPriceError(price);
-    this.price = price;
+  // Mutations modify state in-place and validate invariants
+  update(/* fields */): void {
+    // validate, then assign
   }
 }
 ```
@@ -190,17 +250,15 @@ src/application/{module}/
 ```
 
 ```typescript
-// src/application/product/dto/create-product.dto.ts
-export interface CreateProductCommand {
+// src/application/{module}/dto/{action}-{module}.dto.ts
+export interface Create{Module}Command {
   id: string;
-  name: string;
-  price: number;
+  // ... domain-specific fields
 }
 
-export interface CreateProductResult {
+export interface Create{Module}Result {
   id: string;
-  name: string;
-  price: number;
+  // ... fields to return
 }
 ```
 
@@ -211,11 +269,12 @@ Use cases return **plain objects** matching the Result interface — never entit
 Every repository port exposes these five methods as the CRUD baseline. `save()` is for create, `update()` is for update — never merged into a single upsert.
 
 ```typescript
-export interface IProductRepository {
-  findAll(): Promise<Product[]>;
-  findById(id: string): Promise<Product | null>;
-  save(entity: Product): Promise<void>;
-  update(entity: Product): Promise<void>;
+// src/domain/{module}/ports/{module}.repository.port.ts
+export interface I{Module}Repository {
+  findAll(): Promise<{Entity}[]>;
+  findById(id: string): Promise<{Entity} | null>;
+  save(entity: {Entity}): Promise<void>;
+  update(entity: {Entity}): Promise<void>;
   delete(id: string): Promise<void>;
 }
 ```
@@ -251,15 +310,21 @@ export abstract class BaseController {
 ```
 
 ```typescript
-// Express adapter
-export class CreateProductController extends BaseController {
-  async handle(req: Request, res: Response): Promise<void> {
-    const response = await this.handleRequest(
-      () => this.useCase.execute(ProductSchema.parse(req.body)),
+// src/infrastructure/entry-points/{module}.controller.ts
+export class {Module}Controller extends BaseController {
+  constructor(private readonly createUseCase: Create{Module}UseCase) {
+    super();
+  }
+
+  async create(req: HttpRequest): Promise<HttpResponse> {
+    const parsed = Create{Module}Schema.safeParse(req.body);
+    if (!parsed.success) return { status: 400, body: { error: parsed.error.format() } };
+
+    return this.handleRequest(
+      () => this.createUseCase.execute(parsed.data),
       (result) => ({ status: 201, body: result }),
       (error: ErrorResponse) => ({ status: error.status, body: { error: error.message } }),
     );
-    res.status(response.status).json(response.body);
   }
 }
 ```
@@ -409,10 +474,9 @@ describe('PlaceOrderUseCase', () => {
 
 ## Tooling Notes
 
-- **Runtime:** Node.js 24 ESM native — use `import/export`, never `require()`
-- **TypeScript:** `strict: true`, `verbatimModuleSyntax: true` + `isolatedModules: true` — cualquier import que sea solo un tipo **debe** usar `import type { Foo } from '...'`, nunca `import { Foo }`
-- **`.js` extensions in imports:** Required in every `import` even though we write `.ts` files. Node.js ESM resolves extensions literally; TypeScript with `"moduleResolution": "bundler"` or `"node16"` does NOT rewrite paths. The rule: **write the extension you want the runtime to see** — which is `.js` (TypeScript maps `.ts` → `.js` at emit time). Example: `import { Foo } from './foo.js'` inside `foo.ts` is correct.
-- **ESLint:** Flat config (`eslint.config.js`). `no-explicit-any` is an **error** (not warn) — use `unknown` instead of `any`. For forced type casts use `value as unknown as TargetType`. `no-empty-interface` is OFF (domain ports use empty interfaces as markers).
+- **Runtime:** Node.js 24 ESM native — `import/export` only, never `require()`
+- **TypeScript:** `strict: true`, `verbatimModuleSyntax: true`, `isolatedModules: true`. See **TypeScript & Import Rules** above.
+- **ESLint:** Flat config (`eslint.config.js`). `no-empty-interface` is OFF (domain ports use empty interfaces as markers). See **TypeScript & Import Rules** for `any` and `import type` enforcement.
 - **esbuild:** Custom `scripts/build.js` handles path alias resolution for production bundle
 - **Pre-commit hook:** Runs ESLint fix + Prettier + tests on staged `.ts` files automatically
 - **Logger:** Always inject `ILogger` via constructor — never import Pino directly in domain/application layers
