@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BaseController } from '../base.controller.js';
-import type { ErrorResponse } from '../base.controller.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BaseController } from '@infra/entry-points/base.controller.js';
+import type { HttpResponse, ErrorResponse } from '@infra/entry-points/base.controller.js';
 import { DomainError } from '@shared/errors/domain.error.js';
 import { NotFoundError } from '@shared/errors/not-found.error.js';
 
@@ -17,55 +17,49 @@ class TestDomainError extends DomainError {
 }
 
 class TestController extends BaseController {
-  async run<T>(
-    action: () => Promise<T>,
-    onSuccess: (result: T) => void,
-    onError: (error: ErrorResponse) => void,
-  ): Promise<void> {
-    return this.handleRequest(action, onSuccess, onError);
+  async run<T>(action: () => Promise<T>): Promise<HttpResponse> {
+    return this.handleRequest(
+      action,
+      (result) => ({ status: 200, body: result }),
+      (error: ErrorResponse) => ({ status: error.status, body: { error: error.message } }),
+    );
   }
 }
 
 describe('BaseController', () => {
   let controller: TestController;
-  let onSuccess: ReturnType<typeof vi.fn>;
-  let onError: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     controller = new TestController();
-    onSuccess = vi.fn();
-    onError = vi.fn();
   });
 
-  it('calls onSuccess with the result on happy path', async () => {
-    await controller.run(() => Promise.resolve({ id: '1' }), onSuccess, onError);
+  it('returns 200 with result on happy path', async () => {
+    const response = await controller.run(() => Promise.resolve({ id: '1' }));
 
-    expect(onSuccess).toHaveBeenCalledWith({ id: '1' });
-    expect(onError).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ id: '1' });
   });
 
-  it('calls onError with status 404 when NotFoundError is thrown', async () => {
-    await controller.run(() => Promise.reject(new TestNotFoundError()), onSuccess, onError);
+  it('returns 404 when NotFoundError is thrown', async () => {
+    const response = await controller.run(() => Promise.reject(new TestNotFoundError()));
 
-    expect(onError).toHaveBeenCalledWith({ status: 404, message: 'resource not found' });
-    expect(onSuccess).not.toHaveBeenCalled();
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: 'resource not found' });
   });
 
-  it('calls onError with status 400 when a generic DomainError is thrown', async () => {
-    await controller.run(() => Promise.reject(new TestDomainError()), onSuccess, onError);
+  it('returns 400 when a generic DomainError is thrown', async () => {
+    const response = await controller.run(() => Promise.reject(new TestDomainError()));
 
-    expect(onError).toHaveBeenCalledWith({ status: 400, message: 'business rule violated' });
-    expect(onSuccess).not.toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'business rule violated' });
   });
 
-  it('calls onError with status 500 for unknown errors', async () => {
-    await controller.run(
+  it('returns 500 for unknown errors', async () => {
+    const response = await controller.run(
       () => Promise.reject(new Error('unexpected DB failure')),
-      onSuccess,
-      onError,
     );
 
-    expect(onError).toHaveBeenCalledWith({ status: 500, message: 'Internal server error' });
-    expect(onSuccess).not.toHaveBeenCalled();
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'Internal server error' });
   });
 });

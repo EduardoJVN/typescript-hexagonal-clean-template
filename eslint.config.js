@@ -20,7 +20,7 @@ export default tseslint.config(
     rules: {
       // Reglas de calidad (ajusta a tu gusto)
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       'no-console': ['warn', { allow: ['info', 'error'] }],
       // Hexagonal: permitir interfaces vacías para Domain Tags
       '@typescript-eslint/no-empty-interface': 'off',

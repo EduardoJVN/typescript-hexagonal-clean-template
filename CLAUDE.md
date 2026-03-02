@@ -254,11 +254,12 @@ export abstract class BaseController {
 // Express adapter
 export class CreateProductController extends BaseController {
   async handle(req: Request, res: Response): Promise<void> {
-    await this.handleRequest(
+    const response = await this.handleRequest(
       () => this.useCase.execute(ProductSchema.parse(req.body)),
-      (result) => res.status(201).json(result),
-      (err: any) => res.status(err.status).json({ error: err.message }),
+      (result) => ({ status: 201, body: result }),
+      (error: ErrorResponse) => ({ status: error.status, body: { error: error.message } }),
     );
+    res.status(response.status).json(response.body);
   }
 }
 ```
@@ -342,6 +343,8 @@ export class InvalidPriceError extends DomainError {
 | Generate IDs inside the entity | ID source is an infrastructure decision, pass it as parameter |
 | Merge `save()` and `update()` into a single upsert | `save()` = insert, `update()` = update — keep intent explicit |
 | Handle errors in individual controllers | Extend `BaseController` and use `handleRequest()` |
+| Use `as any` for type casts | Use `as unknown as TargetType` — keeps type safety and ESLint passing |
+| Use `any` anywhere | `no-explicit-any` is an ESLint **error** in this project — use `unknown` instead |
 
 ## Testing Patterns
 
@@ -408,7 +411,8 @@ describe('PlaceOrderUseCase', () => {
 
 - **Runtime:** Node.js 24 ESM native — use `import/export`, never `require()`
 - **TypeScript:** `strict: true`, `verbatimModuleSyntax: true` + `isolatedModules: true` — cualquier import que sea solo un tipo **debe** usar `import type { Foo } from '...'`, nunca `import { Foo }`
-- **ESLint:** Flat config (`eslint.config.js`) — `no-empty-interface` is OFF (domain ports use empty interfaces as markers)
+- **`.js` extensions in imports:** Required in every `import` even though we write `.ts` files. Node.js ESM resolves extensions literally; TypeScript with `"moduleResolution": "bundler"` or `"node16"` does NOT rewrite paths. The rule: **write the extension you want the runtime to see** — which is `.js` (TypeScript maps `.ts` → `.js` at emit time). Example: `import { Foo } from './foo.js'` inside `foo.ts` is correct.
+- **ESLint:** Flat config (`eslint.config.js`). `no-explicit-any` is an **error** (not warn) — use `unknown` instead of `any`. For forced type casts use `value as unknown as TargetType`. `no-empty-interface` is OFF (domain ports use empty interfaces as markers).
 - **esbuild:** Custom `scripts/build.js` handles path alias resolution for production bundle
 - **Pre-commit hook:** Runs ESLint fix + Prettier + tests on staged `.ts` files automatically
 - **Logger:** Always inject `ILogger` via constructor — never import Pino directly in domain/application layers
