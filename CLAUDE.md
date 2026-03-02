@@ -166,14 +166,23 @@ Never group multiple operations in one class. Never add methods other than `exec
 When adding a new feature, create files in this order — domain first, infrastructure last.
 
 ```
-1. src/domain/{module}/ports/{name}.port.ts              ← interface (driven port)
-2. src/domain/{module}/entities/{name}.entity.ts         ← entity (if needed)
-3. src/domain/{module}/errors/{name}.error.ts            ← domain errors
-4. src/application/{module}/dto/{action}-{module}.dto.ts ← Command + Result interfaces
-5. src/application/{module}/use-cases/{action}.use-case.ts
-6. src/infrastructure/adapters/{name}.adapter.ts         ← implements the port
-7. src/infrastructure/entry-points/{name}.controller.ts  ← extends BaseController
-8. Wire in app.ts                                        ← instantiate + inject
+1. src/domain/{module}/ports/{name}.repository.port.ts        ← IRepository interface
+2. src/domain/{module}/entities/{name}.entity.ts              ← entity (if needed)
+3. src/domain/{module}/errors/{name}-not-found.error.ts       ← NotFoundError subclass
+   src/domain/{module}/errors/invalid-{rule}.error.ts         ← DomainError subclasses
+4. src/application/{module}/dto/create-{module}.dto.ts        ← one DTO file per operation
+   src/application/{module}/dto/get-{module}.dto.ts
+   src/application/{module}/dto/list-{module}s.dto.ts
+   src/application/{module}/dto/update-{module}.dto.ts
+   src/application/{module}/dto/delete-{module}.dto.ts        ← Command only, no Result
+5. src/application/{module}/use-cases/create-{module}.use-case.ts  ← one file per operation
+   src/application/{module}/use-cases/get-{module}.use-case.ts
+   src/application/{module}/use-cases/list-{module}s.use-case.ts
+   src/application/{module}/use-cases/update-{module}.use-case.ts
+   src/application/{module}/use-cases/delete-{module}.use-case.ts
+6. src/infrastructure/adapters/{name}.adapter.ts              ← implements the port
+7. src/infrastructure/entry-points/{name}.controller.ts       ← extends BaseController
+8. Wire in app.ts / framework bootstrap                       ← instantiate + inject
 ```
 
 **Tests are mandatory and created at the same time as the implementation — never after.**
@@ -268,6 +277,16 @@ export interface Create{Module}Result {
 
 Use cases return **plain objects** matching the Result interface — never entity instances.
 
+Operations that produce no output (e.g. delete, fire-and-forget commands) define **only a Command** — no Result interface. The `execute()` method returns `Promise<void>`.
+
+```typescript
+// src/application/{module}/dto/delete-{module}.dto.ts
+export interface Delete{Module}Command {
+  id: string;
+}
+// No DeleteResult — execute() returns Promise<void>
+```
+
 ## Repository Port Contract
 
 Every repository port exposes these five methods as the CRUD baseline. `save()` is for create, `update()` is for update — never merged into a single upsert.
@@ -336,8 +355,15 @@ export abstract class BaseController {
 import { BaseController } from './base.controller.js';
 import type { HttpRequest, HttpResponse } from './base.controller.js';
 
+// One use case injected per operation — never group them into a single service
 export class {Module}Controller extends BaseController {
-  constructor(private readonly createUseCase: Create{Module}UseCase) {
+  constructor(
+    private readonly createUseCase: Create{Module}UseCase,
+    private readonly getUseCase: Get{Module}UseCase,
+    private readonly listUseCase: List{Module}sUseCase,
+    private readonly updateUseCase: Update{Module}UseCase,
+    private readonly deleteUseCase: Delete{Module}UseCase,
+  ) {
     super();
   }
 
@@ -348,6 +374,44 @@ export class {Module}Controller extends BaseController {
     return this.handleRequest(
       () => this.createUseCase.execute(parsed.data),
       (result) => ({ status: 201, body: result }),
+      (error) => ({ status: error.status, body: { error: error.message } }),
+    );
+  }
+
+  async getById(req: HttpRequest): Promise<HttpResponse> {
+    const id = req.params?.id ?? '';
+    return this.handleRequest(
+      () => this.getUseCase.execute({ id }),
+      (result) => ({ status: 200, body: result }),
+      (error) => ({ status: error.status, body: { error: error.message } }),
+    );
+  }
+
+  async list(_req: HttpRequest): Promise<HttpResponse> {
+    return this.handleRequest(
+      () => this.listUseCase.execute(),
+      (result) => ({ status: 200, body: result }),
+      (error) => ({ status: error.status, body: { error: error.message } }),
+    );
+  }
+
+  async update(req: HttpRequest): Promise<HttpResponse> {
+    const id = req.params?.id ?? '';
+    const parsed = Update{Module}BodySchema.safeParse(req.body);
+    if (!parsed.success) return { status: 400, body: { error: parsed.error.message } };
+
+    return this.handleRequest(
+      () => this.updateUseCase.execute({ id, ...parsed.data }),
+      (result) => ({ status: 200, body: result }),
+      (error) => ({ status: error.status, body: { error: error.message } }),
+    );
+  }
+
+  async delete(req: HttpRequest): Promise<HttpResponse> {
+    const id = req.params?.id ?? '';
+    return this.handleRequest(
+      () => this.deleteUseCase.execute({ id }),
+      () => ({ status: 204, body: null }),
       (error) => ({ status: error.status, body: { error: error.message } }),
     );
   }
@@ -404,6 +468,7 @@ Always use `safeParse` (not `parse`) in controllers — it returns `{ success, d
 const schema = z.object({ email: z.string().email(), name: z.string().min(1) });
 
 const parsed = schema.safeParse(req.body);
+// Always use parsed.error.message — not .format() or .issues
 if (!parsed.success) return { status: 400, body: { error: parsed.error.message } };
 
 await this.handleRequest(
@@ -460,7 +525,11 @@ export abstract class DomainError extends Error {
 }
 
 // src/shared/errors/not-found.error.ts  ← base for not-found errors (maps to HTTP 404)
-export abstract class NotFoundError extends DomainError {}
+export abstract class NotFoundError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
 
 // src/domain/{module}/errors/{entity}-not-found.error.ts
 export class UserNotFoundError extends NotFoundError {
@@ -522,17 +591,29 @@ describe('Order', () => {
 Never use `vi.fn()` for ports. Implement the port interface as a class — this catches type mismatches and keeps mocks readable.
 
 ```typescript
-// In the same spec file or a shared helpers/ file
+// In the same spec file
 class MockOrderRepository implements IOrderRepository {
-  savedOrders: Order[] = [];
+  saved: Order[] = [];
 
-  async findById(id: OrderId): Promise<Order | null> {
-    return this.savedOrders.find(o => o.id.equals(id)) ?? null;
+  async findAll(): Promise<Order[]> { return [...this.saved]; }
+  async findById(id: string): Promise<Order | null> {
+    return this.saved.find(o => o.id === id) ?? null;
   }
+  async save(entity: Order): Promise<void> { this.saved.push(entity); }
+  async update(entity: Order): Promise<void> {
+    const i = this.saved.findIndex(o => o.id === entity.id);
+    if (i >= 0) this.saved[i] = entity;
+  }
+  async delete(id: string): Promise<void> {
+    this.saved = this.saved.filter(o => o.id !== id);
+  }
+}
 
-  async save(order: Order): Promise<void> {
-    this.savedOrders.push(order);
-  }
+class MockLogger implements ILogger {
+  info = vi.fn();
+  error = vi.fn();
+  warn = vi.fn();
+  debug = vi.fn();
 }
 
 describe('PlaceOrderUseCase', () => {
@@ -545,8 +626,8 @@ describe('PlaceOrderUseCase', () => {
   });
 
   it('saves the order', async () => {
-    await useCase.execute({ customerId: 'cust-1', ... });
-    expect(repo.savedOrders).toHaveLength(1);
+    await useCase.execute({ id: 'ord-1', customerId: 'cust-1' });
+    expect(repo.saved).toHaveLength(1);
   });
 });
 ```
