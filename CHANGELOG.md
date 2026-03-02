@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.1.0...v1.1.1) (2026-03-02)
+
+
+### Bug Fixes
+
+* deploy prod ([560b6a3](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/560b6a39a4b16df9dffa382b657998a8d7ffbe34))
+* deploy prod ([1a36386](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/1a3638636373adb889e764f07ceeb96e99d73e1d))
+* deploy prod ([c798c92](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/c798c922fc0f58d271cbfd43555bed806c8a0a8a))
+
 ## [1.1.0](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.0.0...v1.1.0) (2026-02-27)
 
 
