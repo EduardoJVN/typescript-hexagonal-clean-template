@@ -140,7 +140,7 @@ The goal is **100% branch coverage** on the use case file. Running `yarn test:co
 
 ## Entity Pattern
 
-Entities always use a **private constructor + static `create()` factory**. IDs are generated inside the entity using `crypto.randomUUID()`. Never inject ID generation from outside.
+Entities use a **private constructor** and two static factories. **ID is always received as a parameter** — who generates it (use case, adapter, or database) is an infrastructure decision.
 
 ```typescript
 // src/domain/{module}/entities/{name}.entity.ts
@@ -148,28 +148,50 @@ export class Product {
   private constructor(
     public readonly id: string,
     public readonly name: string,
-    public readonly price: number,
+    public price: number,
   ) {}
 
-  static create(name: string, price: number): Product {
-    return new Product(crypto.randomUUID(), name, price);
+  // For NEW entities — enforce business invariants, emit domain events if needed
+  static create(id: string, name: string, price: number): Product {
+    if (price <= 0) throw new InvalidPriceError(price);
+    return new Product(id, name, price);
   }
 
-  // Business mutations return a new instance (immutable)
-  updatePrice(price: number): Product {
+  // For LOADING from persistence — no validation, no events, just reconstruct state
+  static reconstitute(id: string, name: string, price: number): Product {
+    return new Product(id, name, price);
+  }
+
+  // Mutations modify state in place and validate invariants
+  updatePrice(price: number): void {
     if (price <= 0) throw new InvalidPriceError(price);
-    return new Product(this.id, this.name, price);
+    this.price = price;
   }
 }
 ```
 
-## Commands and Results
+Adapters use `reconstitute()` when mapping DB rows to entities. Use cases use `create()` for new entities.
 
-Every use case defines its input and output types **in the same file**, above the class. No separate `dtos/` folder.
+## DTOs
+
+Each use case has a corresponding DTO file in a `dto/` folder **inside the same module**, named `{action}-{module}.dto.ts`. DTOs are plain TypeScript interfaces — no Zod, no classes.
+
+```
+src/application/{module}/
+  use-cases/
+    create-{module}.use-case.ts
+    __test__/
+      create-{module}.use-case.spec.ts
+  dto/
+    create-{module}.dto.ts
+    get-{module}.dto.ts
+    update-{module}.dto.ts
+```
 
 ```typescript
-// create-product.use-case.ts
+// src/application/product/dto/create-product.dto.ts
 export interface CreateProductCommand {
+  id: string;
   name: string;
   price: number;
 }
@@ -179,52 +201,68 @@ export interface CreateProductResult {
   name: string;
   price: number;
 }
-
-export class CreateProductUseCase {
-  async execute(command: CreateProductCommand): Promise<CreateProductResult> { ... }
-}
 ```
 
-Use cases return **plain objects**, never entity instances. Map the entity to the result type before returning.
+Use cases return **plain objects** matching the Result interface — never entity instances.
 
 ## Repository Port Contract
 
-Every repository port follows this standard contract. Use `save()` as upsert for both create and update.
+Every repository port exposes these five methods as the CRUD baseline. `save()` is for create, `update()` is for update — never merged into a single upsert.
 
 ```typescript
 export interface IProductRepository {
-  findById(id: string): Promise<Product | null>;
   findAll(): Promise<Product[]>;
-  save(entity: Product): Promise<void>;      // upsert — handles create and update
+  findById(id: string): Promise<Product | null>;
+  save(entity: Product): Promise<void>;
+  update(entity: Product): Promise<void>;
   delete(id: string): Promise<void>;
 }
 ```
 
 Never add query-specific methods to the port. If a query doesn't fit `findAll`, create a dedicated read model or a separate query port.
 
-## Error Mapping in Controllers
+## Central Error Handler
 
-Controllers use a single `try/catch` per `handle()` method. Map `DomainError` subclasses to protocol status codes — never expose raw error messages to the client.
+Controllers do **not** handle errors individually. All controllers extend `BaseController`, which provides a single `handleRequest()` wrapper that catches and maps all throws.
 
 ```typescript
-async handle(req: Request, res: Response): Promise<void> {
-  try {
-    const command = ProductSchema.parse(req.body);
-    const result = await this.useCase.execute(command);
-    res.status(201).json(result);
-  } catch (error) {
-    if (error instanceof ProductNotFoundError) {
-      res.status(404).json({ error: error.message });
-    } else if (error instanceof DomainError) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: 'Internal server error' });
+// src/infrastructure/entry-points/base.controller.ts
+export abstract class BaseController {
+  protected async handleRequest<T>(
+    action: () => Promise<T>,
+    onSuccess: (result: T) => void,
+    onError: (error: unknown) => void,
+  ): Promise<void> {
+    try {
+      const result = await action();
+      onSuccess(result);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        onError({ status: 404, message: error.message });
+      } else if (error instanceof DomainError) {
+        onError({ status: 400, message: error.message });
+      } else {
+        onError({ status: 500, message: 'Internal server error' });
+      }
     }
   }
 }
 ```
 
-For Lambda, return the equivalent `statusCode` instead of calling `res`.
+```typescript
+// Express adapter
+export class CreateProductController extends BaseController {
+  async handle(req: Request, res: Response): Promise<void> {
+    await this.handleRequest(
+      () => this.useCase.execute(ProductSchema.parse(req.body)),
+      (result) => res.status(201).json(result),
+      (err: any) => res.status(err.status).json({ error: err.message }),
+    );
+  }
+}
+```
+
+`BaseController` lives in `src/infrastructure/entry-points/`. Swapping to Lambda means overriding only the `onSuccess`/`onError` callbacks — error classification logic stays in one place.
 
 ## Validation
 
@@ -295,6 +333,8 @@ The use case is completely unaware of HTTP, Lambda, or any protocol. Swapping en
 
 | Never do this | Why |
 |---|---|
+| Never do this | Why |
+|---|---|
 | Import `express`, `aws-lambda`, or any HTTP lib outside `infrastructure/entry-points/` | Couples business logic to a protocol |
 | Import a repository adapter directly in a use case | Breaks DI — use the port interface |
 | Use `vi.fn()` to mock a port | Doesn't enforce the interface contract |
@@ -303,6 +343,10 @@ The use case is completely unaware of HTTP, Lambda, or any protocol. Swapping en
 | Throw `new Error()` from domain | Use a typed `DomainError` subclass |
 | Add business logic to a controller | Controllers only translate, never decide |
 | Access `process.env` outside `infrastructure/config/` | Centralizes env coupling |
+| Use `create()` in adapters when loading from DB | Use `reconstitute()` — `create()` is for new entities only |
+| Generate IDs inside the entity | ID source is an infrastructure decision, pass it as parameter |
+| Merge `save()` and `update()` into a single upsert | `save()` = insert, `update()` = update — keep intent explicit |
+| Handle errors in individual controllers | Extend `BaseController` and use `handleRequest()` |
 
 ## Testing Patterns
 
