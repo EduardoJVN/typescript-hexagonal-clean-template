@@ -100,13 +100,14 @@ Never group multiple operations in one class. Never add methods other than `exec
 When adding a new feature, create files in this order — domain first, infrastructure last.
 
 ```
-1. src/domain/{module}/ports/{name}.port.ts          ← interface (driven port)
-2. src/domain/{module}/entities/{name}.ts            ← entity / value object (if needed)
-3. src/domain/{module}/errors/{name}.error.ts        ← domain errors
-4. src/application/{module}/use-cases/{action}.use-case.ts
-5. src/infrastructure/adapters/{name}.adapter.ts     ← implements the port
-6. src/infrastructure/entry-points/{name}.controller.ts  ← HTTP/Lambda/CLI adapter
-7. Wire in app.ts                                    ← instantiate + inject
+1. src/domain/{module}/ports/{name}.port.ts              ← interface (driven port)
+2. src/domain/{module}/entities/{name}.entity.ts         ← entity (if needed)
+3. src/domain/{module}/errors/{name}.error.ts            ← domain errors
+4. src/application/{module}/dto/{action}-{module}.dto.ts ← Command + Result interfaces
+5. src/application/{module}/use-cases/{action}.use-case.ts
+6. src/infrastructure/adapters/{name}.adapter.ts         ← implements the port
+7. src/infrastructure/entry-points/{name}.controller.ts  ← extends BaseController
+8. Wire in app.ts                                        ← instantiate + inject
 ```
 
 **Tests are mandatory and created at the same time as the implementation — never after.**
@@ -279,12 +280,25 @@ await createUserUseCase.execute(input);
 
 The use case receives already-validated plain objects. Entities enforce business invariants by throwing domain errors, not by parsing schemas.
 
+## Shared
+
+`src/shared/` contains cross-cutting base classes used by all modules. **Do not add anything here that is specific to a single module.**
+
+```
+src/shared/
+  errors/
+    domain.error.ts       ← abstract base for all domain errors
+    not-found.error.ts    ← base for all "entity not found" errors
+```
+
+These are the only two files that belong in `shared/errors/` at this stage. Every module-specific error extends one of them.
+
 ## Domain Errors
 
-Extend a base `DomainError` — never `throw new Error()` from domain or application.
+Two base classes in `shared/`, module-specific errors extend them. Never `throw new Error()`.
 
 ```typescript
-// src/shared/errors/domain.error.ts
+// src/shared/errors/domain.error.ts  ← base for all domain errors (maps to HTTP 400)
 export abstract class DomainError extends Error {
   constructor(message: string) {
     super(message);
@@ -292,47 +306,28 @@ export abstract class DomainError extends Error {
   }
 }
 
-// src/domain/{module}/errors/user-not-found.error.ts
-export class UserNotFoundError extends DomainError {
+// src/shared/errors/not-found.error.ts  ← base for not-found errors (maps to HTTP 404)
+export abstract class NotFoundError extends DomainError {}
+
+// src/domain/{module}/errors/{entity}-not-found.error.ts
+export class UserNotFoundError extends NotFoundError {
   constructor(id: string) {
     super(`User not found: ${id}`);
   }
 }
-```
 
-Infrastructure/entry-points catch domain errors and map them to protocol responses (HTTP 404, Lambda error payload, etc.).
-
-## Entry-Point Adapter Pattern
-
-Controllers are pure translators: protocol event → command → use case → protocol response. **Zero business logic.**
-
-```typescript
-// infrastructure/entry-points/create-user.controller.ts
-export class CreateUserController {
-  constructor(private readonly useCase: CreateUserUseCase) {}
-
-  // Express version
-  async handle(req: Request, res: Response): Promise<void> {
-    const command = CreateUserSchema.parse(req.body);   // validate + map
-    const result = await this.useCase.execute(command);  // delegate
-    res.status(201).json(result);                        // map to protocol
-  }
-
-  // Lambda version — same use case, different adapter
-  async handleLambda(event: APIGatewayEvent): Promise<APIGatewayProxyResult> {
-    const command = CreateUserSchema.parse(JSON.parse(event.body ?? '{}'));
-    const result = await this.useCase.execute(command);
-    return { statusCode: 201, body: JSON.stringify(result) };
+// src/domain/{module}/errors/{rule-violation}.error.ts
+export class InvalidPriceError extends DomainError {
+  constructor(price: number) {
+    super(`Price must be greater than 0, got ${price}`);
   }
 }
 ```
 
-The use case is completely unaware of HTTP, Lambda, or any protocol. Swapping entry points = writing a new adapter only.
+`BaseController` maps the hierarchy automatically: `NotFoundError → 404`, any other `DomainError → 400`, anything else `→ 500`.
 
 ## Anti-Patterns
 
-| Never do this | Why |
-|---|---|
 | Never do this | Why |
 |---|---|
 | Import `express`, `aws-lambda`, or any HTTP lib outside `infrastructure/entry-points/` | Couples business logic to a protocol |
