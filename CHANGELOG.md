@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.0](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.1.1...v1.2.0) (2026-03-02)
+
+
+### Features
+
+* add base claude md ([4619add](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/4619add7c4e1177d5103d7986b55cf6dce0c8622))
+* add base code ([ee50d38](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/ee50d384e143c340f13538e290e31f2db0a54fe0))
+* add code base ([548f550](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/548f55026ce84ba9382239128568da46b9dbf345))
+* add test interface ([d449543](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/d449543a32a9adcd8865780bfb2220e481a7abcc))
+* claude.md ([dd4f2b4](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/dd4f2b47fb4b713d1ae0bd5c9af12c136370c97b))
+* claude.md ([02c7eaa](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/02c7eaab47cc0f6e26489308ce581a13e6ddaa63))
+* code base ([b87263f](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/b87263f6000c5e0f39b4455f5aa70209876f4faa))
+* update claude md ([52cc0f6](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/52cc0f64cfeeb0012c8f74d9732490b506d759cd))
+* update cluade md base ([b765f0d](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/b765f0d0d5383fdf5ba01c78d4b14d1a7638bc05))
+
+
+### Bug Fixes
+
+* claude md ([fb6b8d5](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/fb6b8d5974e29a2fee95bba5678e4ac27553d5b1))
+
 ## [1.1.1](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.1.0...v1.1.1) (2026-03-02)
 
 
