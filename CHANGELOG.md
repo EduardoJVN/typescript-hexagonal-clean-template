@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.0.0...v1.1.0) (2026-02-27)
+
+
+### Features
+
+* add main pipeline progresive ([870d55c](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/870d55c2746bff86ea6f280270bb79c4f360941e))
+* add main pipeline progresive ([81e0b75](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/81e0b758a2c1cbb2ef99a06b7895eb93dfa925da))
+* ci/cd for branches ([dfe273e](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/dfe273e8d5cee047320d254099d49b0896e478b7))
+* ci/cd for branches ([f72ae15](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/f72ae15f39ee8ff4d44ef53de9135d105e839295))
+* delete branch main ci cd ([236ee8f](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/236ee8f913358b7d4f16efc8f994c57f5881faef))
+
+
+### Bug Fixes
+
+* add mr ci cd ([604ab73](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/604ab737488ce5260781495f46195a97e6f2b563))
+* ci cd mr ([d26140a](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/d26140a65f6f958dce13d13f5cdfde9ee9101b31))
+* ci cd validation branch ([d6d5d96](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/d6d5d964d759b050f4ae6023d841854d06a0a1e6))
+
 ## 1.0.0 (2026-02-27)
 
 
