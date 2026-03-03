@@ -12,7 +12,8 @@ async function runBuild() {
       outdir: 'dist',
       target: 'node24',
       alias: {
-        '@core': './src/core',
+        '@domain': './src/domain',
+        '@application': './src/application',
         '@infra': './src/infrastructure',
         '@shared': './src/shared',
       },
