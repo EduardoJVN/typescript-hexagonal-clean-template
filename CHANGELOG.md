@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.2.1...v1.2.2) (2026-03-03)
+
+
+### Bug Fixes
+
+* build aliases ([4814cb9](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/4814cb9cd49ceeb0a9118b5dc367e3c72f238406))
+* build aliases ([d9d00f1](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/commit/d9d00f1ec8383a9c8cd8fec904197cc1a983cab1))
+
 ## [1.2.1](https://github.com/EduardoJVN/typescript-hexagonal-clean-template/compare/v1.2.0...v1.2.1) (2026-03-02)
 
 
